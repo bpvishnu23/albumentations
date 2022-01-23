@@ -19,6 +19,7 @@ __all__ = [
     "RandomResizedCrop",
     "RandomCropNearBBox",
     "RandomSizedBBoxSafeCrop",
+    "RandomSizedBBoxSafeCrop_Modified",
     "CropAndPad",
 ]
 
