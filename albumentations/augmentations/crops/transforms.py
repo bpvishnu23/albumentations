@@ -472,6 +472,7 @@ class RandomCropNearBBox(DualTransform):
 
 class RandomSizedBBoxSafeCrop(DualTransform):
     """Crop a random part of the input and rescale it to some size without loss of bboxes.
+
     Args:
         height (int): height after crop and resize.
         width (int): width after crop and resize.
@@ -480,14 +481,16 @@ class RandomSizedBBoxSafeCrop(DualTransform):
             cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA, cv2.INTER_LANCZOS4.
             Default: cv2.INTER_LINEAR.
         p (float): probability of applying the transform. Default: 1.
+
     Targets:
         image, mask, bboxes
+
     Image types:
         uint8, float32
     """
 
     def __init__(self, height, width, erosion_rate=0.0, interpolation=cv2.INTER_LINEAR, always_apply=False, p=1.0):
-        super(RandomSizedBBoxSafeCrop_Modified, self).__init__(always_apply, p)
+        super(RandomSizedBBoxSafeCrop, self).__init__(always_apply, p)
         self.height = height
         self.width = width
         self.interpolation = interpolation
@@ -508,22 +511,16 @@ class RandomSizedBBoxSafeCrop(DualTransform):
                 "crop_height": crop_height,
                 "crop_width": int(crop_height * img_w / img_h),
             }
-        print(params["bboxes"])
-
-        # bbox random selection  
-        bboxes = params["bboxes"]
-        idx = random.randint(0, len(bboxes)-1)
-        bbox = bboxes[idx]
-        x = bbox[0]; y = bbox[1]; x2 = bbox[2]; y2 = bbox[3]
-
-        # crop parameters
-        r1 = random.random()
-        r2 = random.random()
-        bw, bh = self.width / img_w, self.height / img_h
-        bx, by = (x2 - bw)* r1 + (1 - r1) * x , (y2 - bh) * r2 + (1 - r2) * y
-        
-        crop_height = self.height
-        crop_width = self.width
+        # get union of all bboxes
+        x, y, x2, y2 = union_of_bboxes(
+            width=img_w, height=img_h, bboxes=params["bboxes"], erosion_rate=self.erosion_rate
+        )
+        # find bigger region
+        bx, by = x * random.random(), y * random.random()
+        bx2, by2 = x2 + (1 - x2) * random.random(), y2 + (1 - y2) * random.random()
+        bw, bh = bx2 - bx, by2 - by
+        crop_height = img_h if bh >= 1.0 else int(img_h * bh)
+        crop_width = img_w if bw >= 1.0 else int(img_w * bw)
         h_start = np.clip(0.0 if bh >= 1.0 else by / (1.0 - bh), 0.0, 1.0)
         w_start = np.clip(0.0 if bw >= 1.0 else bx / (1.0 - bw), 0.0, 1.0)
         return {"h_start": h_start, "w_start": w_start, "crop_height": crop_height, "crop_width": crop_width}
