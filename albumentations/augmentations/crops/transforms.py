@@ -535,6 +535,74 @@ class RandomSizedBBoxSafeCrop(DualTransform):
         return ("height", "width", "erosion_rate", "interpolation")
 
 
+class RandomSizedBBoxSafeCrop_Modified(DualTransform):
+    """Crop a random part of the input and rescale it to some size without loss of bboxes.
+    Args:
+        height (int): height after crop and resize.
+        width (int): width after crop and resize.
+        erosion_rate (float): erosion rate applied on input image height before crop.
+        interpolation (OpenCV flag): flag that is used to specify the interpolation algorithm. Should be one of:
+            cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA, cv2.INTER_LANCZOS4.
+            Default: cv2.INTER_LINEAR.
+        p (float): probability of applying the transform. Default: 1.
+    Targets:
+        image, mask, bboxes
+    Image types:
+        uint8, float32
+    """
+
+    def __init__(self, height, width, erosion_rate=0.0, interpolation=cv2.INTER_LINEAR, always_apply=False, p=1.0):
+        super(RandomSizedBBoxSafeCrop_Modified, self).__init__(always_apply, p)
+        self.height = height
+        self.width = width
+        self.interpolation = interpolation
+        self.erosion_rate = erosion_rate
+
+    def apply(self, img, crop_height=0, crop_width=0, h_start=0, w_start=0, interpolation=cv2.INTER_LINEAR, **params):
+        crop = F.random_crop(img, crop_height, crop_width, h_start, w_start)
+        return FGeometric.resize(crop, self.height, self.width, interpolation)
+
+    def get_params_dependent_on_targets(self, params):
+        img_h, img_w = params["image"].shape[:2]
+        if len(params["bboxes"]) == 0:  # less likely, this class is for use with bboxes.
+            erosive_h = int(img_h * (1.0 - self.erosion_rate))
+            crop_height = img_h if erosive_h >= img_h else random.randint(erosive_h, img_h)
+            return {
+                "h_start": random.random(),
+                "w_start": random.random(),
+                "crop_height": crop_height,
+                "crop_width": int(crop_height * img_w / img_h),
+            }
+        print(params["bboxes"])
+
+        # bbox random selection  
+        bboxes = params["bboxes"]
+        idx = random.randint(0, len(bboxes)-1)
+        bbox = bboxes[idx]
+        x = bbox[0]; y = bbox[1]; x2 = bbox[2]; y2 = bbox[3]
+
+        # crop parameters
+        r1 = random.random()
+        r2 = random.random()
+        bw, bh = self.width / img_w, self.height / img_h
+        bx, by = (x2 - bw)* r1 + (1 - r1) * x , (y2 - bh) * r2 + (1 - r2) * y
+        
+        crop_height = self.height
+        crop_width = self.width
+        h_start = np.clip(0.0 if bh >= 1.0 else by / (1.0 - bh), 0.0, 1.0)
+        w_start = np.clip(0.0 if bw >= 1.0 else bx / (1.0 - bw), 0.0, 1.0)
+        return {"h_start": h_start, "w_start": w_start, "crop_height": crop_height, "crop_width": crop_width}
+
+    def apply_to_bbox(self, bbox, crop_height=0, crop_width=0, h_start=0, w_start=0, rows=0, cols=0, **params):
+        return F.bbox_random_crop(bbox, crop_height, crop_width, h_start, w_start, rows, cols)
+
+    @property
+    def targets_as_params(self):
+        return ["image", "bboxes"]
+
+    def get_transform_init_args_names(self):
+        return ("height", "width", "erosion_rate", "interpolation")
+
 class CropAndPad(DualTransform):
     """Crop and pad images by pixel amounts or fractions of image sizes.
     Cropping removes pixels at the sides (i.e. extracts a subimage from a given full image).
