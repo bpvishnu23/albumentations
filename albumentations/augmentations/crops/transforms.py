@@ -487,7 +487,6 @@ class RandomSizedBBoxSafeCrop(DualTransform):
 
     Image types:
         uint8, float32
-        haha
     """
 
     def __init__(self, height, width, erosion_rate=0.0, interpolation=cv2.INTER_LINEAR, always_apply=False, p=1.0):
@@ -575,7 +574,6 @@ class RandomSizedBBoxSafeCrop_Modified(DualTransform):
                 "crop_height": crop_height,
                 "crop_width": int(crop_height * img_w / img_h),
             }
-        print(params["bboxes"])
 
         # bbox random selection  
         bboxes = params["bboxes"]
