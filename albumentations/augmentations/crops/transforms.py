@@ -487,6 +487,7 @@ class RandomSizedBBoxSafeCrop(DualTransform):
 
     Image types:
         uint8, float32
+        haha
     """
 
     def __init__(self, height, width, erosion_rate=0.0, interpolation=cv2.INTER_LINEAR, always_apply=False, p=1.0):
